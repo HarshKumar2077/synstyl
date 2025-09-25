@@ -110,7 +110,7 @@ header_col1, header_col2 = st.columns([3,1])
 with header_col1:
     col_logo, col_text = st.columns([1, 3])
     with col_logo:
-        st.image("data/logoSynStyl.png", width=400)
+        st.image("https://github.com/HarshKumar2077/synstyl/blob/main/logoSynStyl.png?raw=true", width=400)
     with col_text:
         st.markdown('''
         <div style="display: flex; flex-direction: column; justify-content: center; height: 80px; margin-left: 10px;">
@@ -342,3 +342,4 @@ else:
 
 # ---------- footer ----------
 st.markdown("<br><hr>", unsafe_allow_html=True)
+
