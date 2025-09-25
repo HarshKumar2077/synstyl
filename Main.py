@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any, List, Tuple
 import pandas as pd
 import numpy as np
 from datetime import date, datetime, timedelta
-from faker import Faker  # Added for more realistic data generation
+from faker import Faker  # for fake names, emails, etc.
 
 class SyntheticDataGenerator:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -68,7 +68,7 @@ class SyntheticDataGenerator:
         elif gender and gender.lower() in ['female', 'f']:
             name_list = self.config['names']['female']
         else:
-            # Combine both if gender not specified or unknown
+           # fallback: use all names
             name_list = self.config['names']['male'] + self.config['names']['female']
             
         return name_list[r % len(name_list)]
@@ -114,7 +114,7 @@ class SyntheticDataGenerator:
     
     def _det_card(self, salt: str, key: str, brand: str = "visa") -> str:
         if brand not in self.config['card_brands']:
-            brand = "visa"  # Default to visa
+            brand = "visa"  # default
             
         prefix = self.config['card_brands'][brand]
         base = f"{prefix}{str(self._hashint(salt, 'card|' + key))[:15-len(prefix)]}".zfill(15)
@@ -178,10 +178,9 @@ class SyntheticDataGenerator:
         return column_categories
     
     def generate_synthetic_data(self, df: pd.DataFrame, salt: Optional[str] = None) -> pd.DataFrame:
-        salt = salt if salt else hex(random.getrandbits(128))  # Increased to 128 bits
+        salt = salt if salt else hex(random.getrandbits(128))
         out_rows = []
         
-        # Detect column types
         column_types = self._detect_column_types(df)
         
         for i, row in df.iterrows():
@@ -191,7 +190,7 @@ class SyntheticDataGenerator:
             
             new = row.copy()
             
-            # Process name columns
+            # Names
             for col in column_types['name_columns']:
                 base_key = sender_key if "receiver" not in col.lower() else receiver_key
                 gender = None
@@ -204,12 +203,12 @@ class SyntheticDataGenerator:
                     
                 new[col] = self._det_name(salt, base_key + "|" + col, gender)
             
-            # Process address columns
+            # Address
             for col in column_types['address_columns']:
                 base_key = sender_key if "receiver" not in col.lower() else receiver_key
                 new[col] = self._det_city(salt, base_key + "|" + col)
             
-            # Process ID columns
+            # IDs
             if "SenderAadhar" in df.columns:
                 new["SenderAadhar"] = self._det_digits(salt, sender_key + "|aadhaar", 12)
             if "SenderSSN" in df.columns:
@@ -217,29 +216,29 @@ class SyntheticDataGenerator:
             if "ReceiverSSN" in df.columns:
                 new["ReceiverSSN"] = self._det_digits(salt, receiver_key + "|ssn", 9)
             
-            # Process card columns
+            # Cards
             if "SenderCard" in df.columns:
                 new["SenderCard"] = self._det_card(salt, sender_key, "visa")
             if "ReceiverCard" in df.columns:
                 new["ReceiverCard"] = self._det_card(salt, receiver_key, "mc")
             
-            # Process IP columns
+            # IPs
             for col in column_types['ip_columns']:
                 base_key = sender_key if "receiver" not in col.lower() else receiver_key
                 new[col] = self._det_ip(salt, base_key + "|" + col)
             
-            # Process ISP columns
+            # ISPs
             for col in [c for c in df.columns if "isp" in c.lower()]:
                 base_key = sender_key if "receiver" not in col.lower() else receiver_key
                 new[col] = self._det_isp(salt, base_key + "|" + col)
             
-            # Process gender columns
+            # Gender
             for col in column_types['gender_columns']:
                 base_key = sender_key if "receiver" not in col.lower() else receiver_key
                 r = self._rng(salt, "gender|" + base_key)
                 new[col] = r.choice(["Male", "Female", "Other"])
             
-            # Process date columns
+            # Dates
             if "SenderDOB" in df.columns:
                 new["SenderDOB"] = self._det_date_young(salt, sender_key)
             if "ReceiverDOB" in df.columns:
@@ -253,7 +252,7 @@ class SyntheticDataGenerator:
             if "LastTransactionDate" in df.columns:
                 new["LastTransactionDate"] = self._det_date_recent(salt, sender_key, years=2)
             
-            # Process amount columns with perturbation
+            # Process Amount columns with perturbation
             for col, params in self.config['amount_ranges'].items():
                 if col in df.columns:
                     low, high, floor = params
@@ -267,11 +266,11 @@ class SyntheticDataGenerator:
                 fraud_config = self.config['fraud_indicators']
                 prob = fraud_config['base_fraud_probability']
                 
-                # High amount increases fraud probability
+                # High amount = fraud probability increases 
                 if amt > fraud_config['high_amount_threshold']:
                     prob += fraud_config['high_amount_risk_increase']
                 
-                # New account increases fraud probability
+                # New account = fraud probability increases
                 if "ReceiverAccountCreationDate" in new:
                     creation_year = int(new["ReceiverAccountCreationDate"][:4])
                     if creation_year >= date.today().year - 1:
@@ -283,7 +282,7 @@ class SyntheticDataGenerator:
         
         return pd.DataFrame(out_rows)
 
-# Global function for backward compatibility
+# wrapper for compatibility
 def generate_synthetic_data(df: pd.DataFrame, salt: Optional[str] = None) -> pd.DataFrame:
     generator = SyntheticDataGenerator()
     return generator.generate_synthetic_data(df, salt)
@@ -292,4 +291,5 @@ if __name__ == "__main__":
     df = pd.read_csv("input_real.csv")
     syn = generate_synthetic_data(df)
     syn.to_csv("synthetic_output.csv", index=False)
+
     print("✅ synthetic_output.csv written")
