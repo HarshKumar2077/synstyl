@@ -75,7 +75,7 @@ class DataTokenizer:
         salt = self._salt_or_new(salt)
         out = df.copy()
         
-        # Create a mapping of column patterns to transformation functions
+       # column → transformation rules
         transformation_map = [
             # Names
             (lambda c: "name" in c.lower() and "transaction" not in c.lower() and "location" not in c.lower(),
@@ -116,14 +116,13 @@ class DataTokenizer:
                 if condition(col):
                     try:
                         out[col] = out[col].astype(str).apply(lambda v: transform(v, col))
-                        break  # Move to next column after applying transformation
+                        break 
                     except Exception as e:
                         print(f"Error processing column {col}: {e}")
-                        # Keep original values if transformation fails
-        
+                        # fallback: leave values unchanged
         return out
 
-# Global function for backward compatibility
+# wrapper for compatibility
 def tokenize_dataset(df: pd.DataFrame, salt: Optional[str] = None) -> pd.DataFrame:
     tokenizer = DataTokenizer()
     return tokenizer.tokenize_dataset(df, salt)
