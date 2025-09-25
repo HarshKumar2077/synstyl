@@ -6,7 +6,7 @@ import random
 import time
 from io import StringIO
 
-# Defensive imports: try lower-case module names used earlier
+# streamlit page setup
 try:
     from tokenizer import tokenize_dataset
 except Exception as e:
@@ -17,13 +17,13 @@ try:
 except Exception as e:
     raise ImportError("Main.py must define generate_synthetic_data(df, salt=None). Error: " + str(e))
 
-# ---------- Page config ----------
+# Page config
 st.set_page_config(page_title="SYNSTYL — Turning Patterns into Possibilities",
                    page_icon="🛡️",
                    layout="wide",
                    initial_sidebar_state="auto")
 
-# ---------- Custom CSS & Fonts (Inter) ----------
+# custom css tweaks
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -105,7 +105,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Header ----------
+# header
 header_col1, header_col2 = st.columns([3,1])
 with header_col1:
     col_logo, col_text = st.columns([1, 3])
@@ -123,7 +123,7 @@ with header_col2:
 
 st.markdown("---")
 
-# ---------- Sidebar quick help ----------
+# sidebar guide
 with st.sidebar:
     st.markdown("## Quick guide")
     st.markdown("""
@@ -136,7 +136,7 @@ with st.sidebar:
     st.markdown("⚠️ Note: This prototype demonstrates privacy-preserving transformations. Use secure key management for production.")
     st.markdown("---")
 
-# ---------- Controls & Upload ----------
+# upload + run controls
 col_upload, col_controls = st.columns([2,1])
 with col_upload:
     st.markdown("### Upload dataset (CSV)")
@@ -146,7 +146,7 @@ with col_upload:
 
     # sample generator button
     if st.button("Use sample dataset (100 rows)"):
-        # generate a simple sample CSV client-side (no server write)
+        # build 100 fake rows
         from faker import Faker
         fake = Faker("en_IN")
         rows = []
@@ -194,7 +194,7 @@ with col_controls:
     generate_btn = st.button("Generate Synthetic Data", key="gen")
     regen_btn = st.button("Regenerate (new variation)", key="regen")
 
-# ---------- Helper wrappers (handle function signatures with/without salt) ----------
+# wrappers for tokenizer/generator
 def call_tokenize(df: pd.DataFrame, salt_arg):
     try:
         return tokenize_dataset(df.copy(), salt_arg)
@@ -207,8 +207,7 @@ def call_generate(df: pd.DataFrame, salt_arg):
     except TypeError:
         return generate_synthetic_data(df.copy())
 
-# ---------- Main processing ----------
-# decide source dataframe from upload or sample
+# pick input dataframe
 src_df = None
 if uploaded_file is not None:
     try:
@@ -223,14 +222,14 @@ if src_df is not None:
     st.subheader("Original dataset preview")
     st.dataframe(src_df.head(8), use_container_width=True)
 
-    # decide salt: regen uses fresh random, else use input salt or None
+    # choose salt (random or user input)
     run_salt = None
     if regen_btn:
         run_salt = hex(random.getrandbits(64))
     else:
         run_salt = salt if salt.strip() != "" else None
 
-    # If generate clicked: process
+    # run synthetic generation
     if generate_btn or regen_btn:
         with st.spinner("Tokenizing sensitive fields..."):
             time.sleep(0.4)
@@ -239,13 +238,13 @@ if src_df is not None:
             time.sleep(0.6)
             synthetic = call_generate(tokenized, run_salt)
 
-        # store
+        # save results in session
         st.session_state["tokenized_df"] = tokenized
         st.session_state["synthetic_df"] = synthetic
         st.session_state["run_salt"] = run_salt or "random"
         st.success("✅ Synthetic data generated")
 
-    # if processed previously in session show outputs
+    # show previous results if available
     if "synthetic_df" in st.session_state:
         tokenized = st.session_state["tokenized_df"]
         synthetic = st.session_state["synthetic_df"]
@@ -264,7 +263,7 @@ if src_df is not None:
 
         st.markdown("---")
 
-        # side-by-side tables & download
+        # tables + download buttons
         tcol1, tcol2 = st.columns([1,1], gap="large")
         with tcol1:
             st.markdown("### 🔒 Tokenized sample")
@@ -277,11 +276,11 @@ if src_df is not None:
 
         st.markdown("---")
 
-        # ---------- Visualizations (fixed) ----------
+        # quick charts
         st.subheader("Quick Visualizations")
         viz_col1, viz_col2 = st.columns([1.2, 1], gap="large")
 
-        # choose a numeric column intelligently
+        # pick numeric column
         numeric_cols = src_df.select_dtypes(include=["number"]).columns.tolist()
         prefer = ["TransactionAmount", "Amount", "SenderBankBalance", "ReceiverBankBalance", "SenderAnnualIncome", "ReceiverAnnualIncome"]
         chosen = None
@@ -295,7 +294,7 @@ if src_df is not None:
         with viz_col1:
             if chosen:
                 st.markdown(f"**Distribution overlay — {chosen}**")
-                # Prepare histogram data with samples (avoid huge plot slowdowns)
+                # sample data for plotting
                 a = src_df[chosen].dropna().astype(float)
                 b = synthetic[chosen].dropna().astype(float)
                 # sample up to 1000 for plotting
@@ -314,7 +313,7 @@ if src_df is not None:
         with viz_col2:
             if chosen:
                 st.markdown(f"**Row-wise comparison — {chosen}**")
-                # build alignment for line chart (sample up to 200 points)
+                # align original vs synthetic
                 or_val = src_df[chosen].dropna().astype(float).reset_index(drop=True)
                 syn_val = synthetic[chosen].dropna().astype(float).reset_index(drop=True)
                 # align length by padding/trimming
@@ -340,6 +339,7 @@ if src_df is not None:
 else:
     st.markdown('<div class="card"><h3 style="color:#00e6e6;margin:0">Ready to demo?</h3><p class="muted">Upload your CSV or click <b>Use sample dataset</b> to try the prototype.</p></div>', unsafe_allow_html=True)
 
-# ---------- footer ----------
+# footer
 st.markdown("<br><hr>", unsafe_allow_html=True)
+
 
